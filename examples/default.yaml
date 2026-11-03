@@ -1,0 +1,75 @@
+# HA Remote for Pebble: the config is a list of pages.
+# Each page is its own remote: its own entity (or TV platform), rows, watch buttons and style.
+# Rows work like universal-remote-card. Names come from the page platform's built-in keys and
+# apps (see "Keys & apps" below) or from the page's custom_actions.
+# Up/Down on the watch switch pages. Share settings between pages with YAML anchors (&name / *name).
+
+- name: TV
+  platform: LG webOS
+  media_player_id: media_player.living_room_tv
+  style:
+    accent: '#ff5500'
+  ok: center                      # Select = OK on the TV
+  rows:
+    - [power, home, back, menu]
+    - [touchpad]
+    - [volume_down, volume_mute, volume_up]
+
+- name: AC
+  entity_id: climate.living_room_ac
+  style:
+    theme: light
+    accent: '#0055ff'
+  ok: power
+  rows:
+    - [power, cool, heat, fan_only]
+    - [temperature]
+    - [temp_down, temp_up]
+  custom_actions:
+    - name: power
+      icon: mdi:power
+      tap_action: {action: toggle}            # toggles the page's entity
+    - name: cool
+      icon: mdi:snowflake
+      tap_action: {action: perform-action, perform_action: climate.set_hvac_mode, data: {hvac_mode: cool}}
+    - name: heat
+      icon: mdi:fire
+      tap_action: {action: perform-action, perform_action: climate.set_hvac_mode, data: {hvac_mode: heat}}
+    - name: fan_only
+      icon: mdi:fan
+      tap_action: {action: perform-action, perform_action: climate.set_hvac_mode, data: {hvac_mode: fan_only}}
+    - type: slider                # shows the set temperature; drag to change it
+      name: temperature
+      icon: mdi:thermometer
+      value_attribute: temperature
+      unit_of_measurement: '°'
+      range: [16, 30]
+      step: 0.5
+      tap_action:
+        action: perform-action
+        perform_action: climate.set_temperature
+        data: {temperature: '{{ value }}'}
+    - name: temp_down
+      icon: mdi:minus
+      tap_action:
+        action: perform-action
+        perform_action: climate.set_temperature
+        data: {temperature: "{{ state_attr(config.entity, 'temperature') | float - 0.5 }}"}
+    - name: temp_up
+      icon: mdi:plus
+      tap_action:
+        action: perform-action
+        perform_action: climate.set_temperature
+        data: {temperature: "{{ state_attr(config.entity, 'temperature') | float + 0.5 }}"}
+
+- name: TV box
+  platform: Android TV
+  remote_id: remote.tv_box
+  media_player_id: media_player.tv_box
+  style:
+    accent: '#00aaff'
+  ok: play_pause
+  rows:
+    - [back, home, play_pause, power]
+    - [touchpad]
+    - [netflix, youtube, plex]

@@ -1,0 +1,69 @@
+{
+  "name": "pebble-ha-remote",
+  "author": "aymanetaibi",
+  "version": "1.0.0",
+  "description": "Touchscreen TV / streaming-box remote for Pebble, driven by Home Assistant and configured with universal-remote-card style YAML.",
+  "keywords": [
+    "pebble-app"
+  ],
+  "private": true,
+  "scripts": {
+    "import-urc": "node tools/import-urc.js",
+    "gen": "node tools/build-assets.js && node tools/build-config-page.js",
+    "build": "npm run gen && pebble build",
+    "test": "node --test test/*.test.js",
+    "preview": "node tools/build-config-page.js --preview",
+    "icon": "node tools/make-menu-icon.js"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@mdi/js": "7.4.47",
+    "esbuild": "0.28.2",
+    "js-yaml": "4.1.0"
+  },
+  "pebble": {
+    "displayName": "HA Remote",
+    "uuid": "f03ea863-77c4-4ee3-8366-d5921f363776",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "emery",
+      "gabbro"
+    ],
+    "capabilities": [
+      "configurable"
+    ],
+    "watchapp": {
+      "watchface": false
+    },
+    "messageKeys": [
+      "cmd",
+      "page",
+      "elem",
+      "part",
+      "gesture",
+      "value",
+      "data",
+      "offset",
+      "total",
+      "hash",
+      "text",
+      "screen_w",
+      "screen_h",
+      "shape",
+      "inbox_size",
+      "persist_max",
+      "backup_hash"
+    ],
+    "resources": {
+      "media": [
+        {
+          "type": "bitmap",
+          "name": "IMAGE_MENU_ICON",
+          "file": "images/menu_icon.png",
+          "menuIcon": true
+        }
+      ]
+    }
+  }
+}

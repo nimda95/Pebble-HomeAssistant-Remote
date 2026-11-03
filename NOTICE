@@ -1,0 +1,19 @@
+HA Remote for Pebble includes third-party material:
+
+universal-remote-card (https://github.com/Nerwyn/universal-remote-card)
+  Copyright Nerwyn. Licensed under the Apache License, Version 2.0.
+  Used: default key/source maps for each platform and the brand icon paths
+  (data/urc.json, embedded in src/pkjs/generated/assets.js), and the action semantics
+  this app reimplements.
+
+Material Design Icons (https://pictogrammers.com/library/mdi/), @mdi/js and @mdi/svg 7.4.47
+  Copyright Pictogrammers. Licensed under the Apache License, Version 2.0.
+  Used: icon path data embedded in src/pkjs/generated/assets.js, icons fetched at runtime from
+  jsDelivr, and the launcher icon.
+
+js-yaml (https://github.com/nodeca/js-yaml) 4.1.0
+  Copyright (C) 2011-2015 by Vitaly Puzrin. Licensed under the MIT License.
+  Used: bundled into the settings page (src/pkjs/generated/config_page.js).
+
+Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0
+MIT License: https://opensource.org/licenses/MIT

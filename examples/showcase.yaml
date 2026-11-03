@@ -1,0 +1,45 @@
+# A tour of what HA Remote can do. Paste into the settings page and adjust the entity ids.
+# The first page defines the device and style once (&tv); the others reuse it with `<<: *tv`
+# and override what differs.
+
+- &tv
+  name: Wheel
+  platform: Android TV
+  remote_id: remote.living_room_tv
+  media_player_id: media_player.living_room_tv
+  style: {accent: '#ffaa00'}
+  ok: center
+  rows:
+    - [clickwheel]                # a round d-pad whose ring is a volume click wheel
+    - [back, home, apps]
+  custom_actions:
+    - name: apps
+      icon: mdi:apps
+      tap_action: {action: page, page: Apps}
+
+# Drag anywhere to move the TV's focus; double-tap Back to go home.
+- <<: *tv
+  name: Drag
+  rows:
+    - [dragpad]
+    - - name: back
+        double_tap_action: {action: key, key: HOME}
+      - play_pause
+      - name: lights
+        icon: mdi:lightbulb
+        background: '#555500'
+        tap_action:
+          action: toggle
+          target: {entity_id: light.living_room}
+
+# Numbers and apps, in a light style; Select opens the guide, hold it to go back to the wheel.
+- <<: *tv
+  name: Apps
+  style: {theme: light, accent: '#aa00ff', show_title: false}
+  ok:
+    tap_action: {action: key, key: GUIDE}
+    hold_action: {action: page, page: Wheel}
+  rows:
+    - [netflix, youtube, plex]
+    - [disney, spotify, twitch]
+    - [numpad]

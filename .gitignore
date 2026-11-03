@@ -1,0 +1,25 @@
+# build output (pebble build / waf)
+build/
+.lock-waf*
+.waf*
+*.pbw
+compile_commands.json
+
+# tooling caches
+node_modules/
+__pycache__/
+*.pyc
+
+# local development: emulator libraries, config page preview
+.dev/
+config/preview.html
+
+# editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Generated files that ARE committed on purpose: src/pkjs/generated/*.js are made
+# by `npm run gen` (needs node + devDependencies), which CloudPebble does not run.
