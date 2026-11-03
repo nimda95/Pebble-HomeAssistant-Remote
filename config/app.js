@@ -11,15 +11,13 @@ var layoutLib = require('../src/pkjs/lib/layout');
 var Preview = require('./preview');
 var templates = require('./templates');
 
-var MDI_CDN = 'https://cdn.jsdelivr.net/npm/@mdi/svg@7.4.47/svg/';
-
 var init = window.__PEBBLE_INIT__;
 if (!init || typeof init !== 'object') init = window.__PEBBLE_DEV_INIT__ || {};
 
 var assets = JSON.parse(inflate.gunzipBase64ToString(init.assets));
+// Icons that aren't bundled come from the phone, which loads them from Home
+// Assistant itself (this page cannot reach HA, and makes no other connection).
 var iconCache = init.iconCache || {};
-var fetchedIcons = {};
-var fetching = {};
 
 var $ = function (id) { return document.getElementById(id); };
 
@@ -83,31 +81,6 @@ function debounce(fn, ms) {
     clearTimeout(t);
     t = setTimeout(fn, ms);
   };
-}
-
-// ---------------------------------------------------------------------------- icons from CDN
-
-function fetchMissing(names) {
-  names.forEach(function (key) {
-    var m = /^(mdi|hass):(.+)$/.exec(key);
-    if (!m) return;
-    var name = m[2];
-    if (fetching[name] || iconCache[name] !== undefined) return;
-    fetching[name] = true;
-    fetch(MDI_CDN + encodeURIComponent(name) + '.svg').then(function (r) {
-      if (r.status === 404) return '';
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.text();
-    }).then(function (text) {
-      var mm = /\sd="([^"]+)"/.exec(text || '');
-      iconCache[name] = mm ? mm[1] : '';
-      fetchedIcons[name] = iconCache[name];
-      update();
-    }).catch(function () {
-      // offline: try again on the next edit
-      delete fetching[name];
-    });
-  });
 }
 
 // ---------------------------------------------------------------------------- problems
@@ -174,11 +147,13 @@ function update() {
     try {
       packed = packLib.pack(model, state.screen, iconCache);
       if (packed.missingIcons.length) {
-        fetchMissing(packed.missingIcons);
-        var unknown = packed.missingIcons.filter(function (k) {
+        var unknown = [], later = [];
+        packed.missingIcons.forEach(function (k) {
           var m = /^(mdi|hass):(.+)$/.exec(k);
-          return !m || iconCache[m[2]] === '';
+          if (m && iconCache[m[2]] === undefined) later.push(k);
+          else unknown.push(k);
         });
+        if (later.length) warnings.push('Loaded from Home Assistant after saving: ' + later.join(', '));
         if (unknown.length) warnings.push('Unknown icons (label shown instead): ' + unknown.join(', '));
       }
       if (packed.bytes.length > 150000) errors.push('Layout is too big for the watch (' + Math.round(packed.bytes.length / 1024) + ' KB). Use fewer pages or icons.');
@@ -517,7 +492,6 @@ function save() {
     settings: { url: $('url').value.trim(), token: $('token').value.trim() },
     yaml: $('yaml').value,
     config: state.config,
-    iconCache: fetchedIcons,
   };
   location.href = returnUrl() + encodeURIComponent(JSON.stringify(payload));
 }

@@ -198,7 +198,10 @@ touchpad/circlepad 3), `color` / `background`, or be written inline in `rows`:
 - labels on circlepad directions (give them an `icon`)
 
 Icons: any `mdi:` icon works. About 400 common ones and the card's 52 brand logos are bundled;
-the settings page and phone fetch any others from jsDelivr once and cache them.
+the phone loads any others once from your Home Assistant server (the icon files its own frontend
+ships under `/static/mdi/`) and caches them. The app connects to nothing but Home Assistant: it declares only the
+`Internet` and `LocalNetwork` permissions (manifest version 2), so a Home Assistant URL on your
+home network or on the internet both work, and no location or timeline access is requested.
 
 ## How it works
 

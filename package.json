@@ -1,7 +1,7 @@
 {
   "name": "pebble-ha-remote",
   "author": "aymanetaibi",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Touchscreen TV / streaming-box remote for Pebble, driven by Home Assistant and configured with universal-remote-card style YAML.",
   "keywords": [
     "pebble-app"
@@ -25,6 +25,11 @@
     "displayName": "HA Remote",
     "uuid": "f03ea863-77c4-4ee3-8366-d5921f363776",
     "sdkVersion": "3",
+    "manifestVersion": 2,
+    "usesPermissions": [
+      "Internet",
+      "LocalNetwork"
+    ],
     "enableMultiJS": true,
     "targetPlatforms": [
       "emery",

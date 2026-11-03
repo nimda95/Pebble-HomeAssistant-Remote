@@ -86,7 +86,59 @@ HA.prototype.ping = function (cb) {
   this.request('GET', '/api/', null, cb);
 };
 
-// Plain GET without auth (icons from a CDN). cb(err, text)
+// ---- Material Design Icons from Home Assistant itself ----
+// The HA frontend ships every MDI icon under /static/mdi/ (public, no login):
+// iconMetadata.json lists chunks by their first icon name, and each chunk file
+// maps icon names to SVG path data. So no request ever leaves the user's server.
+var mdiIndex = null, mdiIndexUrl = null, mdiChunk = null, mdiChunkFile = null;
+
+function chunkFor(index, name) {
+  var file = null;
+  for (var i = 0; i < index.parts.length; i++) {
+    var p = index.parts[i];
+    if (p.start !== undefined && p.start !== null && name < p.start) break;
+    file = p.file;
+  }
+  return file;
+}
+
+HA.prototype.staticJson = function (path, cb) {
+  if (!this.url) { cb(new Error('Set the Home Assistant URL in the app settings')); return; }
+  httpGet(this.url + path, function (err, text) {
+    if (err) { cb(err); return; }
+    var json = null;
+    try { json = JSON.parse(text); } catch (e) { cb(new Error('bad JSON from ' + path)); return; }
+    cb(null, json);
+  }, 8000);
+};
+
+// cb(err, pathData): pathData is '' when HA has no such icon.
+HA.prototype.mdiPath = function (name, cb) {
+  var self = this;
+  function fromIndex(index) {
+    var file = chunkFor(index, name);
+    if (!file) { cb(null, ''); return; }
+    if (mdiChunkFile === file && mdiChunk) { cb(null, mdiChunk[name] || ''); return; }
+    self.staticJson('/static/mdi/' + encodeURIComponent(file) + '.json', function (err, json) {
+      if (err) { cb(err); return; }
+      mdiChunk = json || {};                 // one chunk (~50 KB) is kept for the next icon
+      mdiChunkFile = file;
+      cb(null, mdiChunk[name] || '');
+    });
+  }
+  if (mdiIndex && mdiIndexUrl === this.url) { fromIndex(mdiIndex); return; }
+  this.staticJson('/static/mdi/iconMetadata.json', function (err, json) {
+    if (err) { cb(err); return; }
+    if (!json || !Array.isArray(json.parts)) { cb(new Error('Home Assistant icon index not found')); return; }
+    mdiIndex = json;
+    mdiIndexUrl = self.url;
+    mdiChunk = null;
+    mdiChunkFile = null;
+    fromIndex(json);
+  });
+};
+
+// Plain GET without auth (Home Assistant's public static files). cb(err, text)
 function httpGet(url, cb, timeoutMs) {
   var xhr = new XMLHttpRequest();
   var done = false;
@@ -115,4 +167,4 @@ function httpGet(url, cb, timeoutMs) {
   }
 }
 
-module.exports = { HA: HA, httpGet: httpGet, normalizeUrl: normalizeUrl };
+module.exports = { HA: HA, httpGet: httpGet, normalizeUrl: normalizeUrl, chunkFor: chunkFor };

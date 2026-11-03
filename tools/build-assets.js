@@ -2,7 +2,7 @@
 // Builds src/pkjs/generated/assets.js: base64(gzip(JSON)) holding
 //  - the universal-remote-card platform maps and brand icons (data/urc.json)
 //  - the SVG paths of every Material Design Icon those maps reference, plus a curated extra set.
-// Icons outside this set are fetched from the @mdi/svg package on jsDelivr at runtime and cached.
+// Icons outside this set are loaded at runtime from Home Assistant's own /static/mdi/ files and cached.
 'use strict';
 const fs = require('fs');
 const path = require('path');

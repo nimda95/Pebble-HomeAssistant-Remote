@@ -16,8 +16,7 @@ var ASSETS_B64 = require('./generated/assets');
 var CONFIG_PAGE_B64 = require('./generated/config_page');
 var DEFAULTS = require('./generated/default_config');
 
-var VERSION = '1.0.0';
-var MDI_CDN = 'https://cdn.jsdelivr.net/npm/@mdi/svg@7.4.47/svg/';
+var VERSION = '1.1.0';
 var ENTITY_DOMAINS = ['remote', 'media_player', 'script', 'scene', 'button', 'input_button', 'switch', 'light', 'fan', 'input_boolean', 'automation', 'cover'];
 
 // ---------------------------------------------------------------------------- storage
@@ -135,32 +134,31 @@ function chunkSize() {
 
 // ---------------------------------------------------------------------------- icons
 
-// Downloads Material Design Icons that aren't bundled, then calls cb().
+// Loads Material Design Icons that aren't bundled from Home Assistant's own
+// frontend files (one at a time, so its icon index is fetched once), then calls cb().
 function ensureIcons(model, screen, cb) {
   var assets = getAssets();
   var needed = packLib.neededIcons(model, screen).filter(function (k) {
     var m = /^(mdi|hass):(.+)$/.exec(k);
     return m && !assets.mdi[m[2]] && state.iconCache[m[2]] === undefined;
   }).map(function (k) { return k.replace(/^(mdi|hass):/, ''); });
-  if (!needed.length) { cb(); return; }
-  var left = needed.length;
+  if (!needed.length || !ha().url) { cb(); return; }
   var changed = false;
-  needed.forEach(function (name) {
-    haLib.httpGet(MDI_CDN + encodeURIComponent(name) + '.svg', function (err, text) {
+  var next = function (i) {
+    if (i >= needed.length) {
+      if (changed) save('iconCache', state.iconCache);
+      cb();
+      return;
+    }
+    ha().mdiPath(needed[i], function (err, pathData) {
       if (!err) {
-        var m = /\sd="([^"]+)"/.exec(text || '');
-        state.iconCache[name] = m ? m[1] : '';
-        changed = true;
-      } else if (/HTTP 404/.test(err.message)) {
-        state.iconCache[name] = ''; // unknown icon; don't ask again
+        state.iconCache[needed[i]] = pathData;   // '' = HA has no such icon; don't ask again
         changed = true;
       }
-      if (--left === 0) {
-        if (changed) save('iconCache', state.iconCache);
-        cb();
-      }
-    }, 6000);
-  });
+      next(i + 1);                               // on errors, try again with the next layout
+    });
+  };
+  next(0);
 }
 
 // ---------------------------------------------------------------------------- layout sync
