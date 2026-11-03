@@ -3,6 +3,8 @@
 // sends string bodies as application/octet-stream unless Content-Type is set.
 'use strict';
 
+var tr = require('./i18n').t;
+
 function normalizeUrl(url) {
   var u = String(url || '').trim();
   if (!u) return '';
@@ -23,7 +25,7 @@ HA.prototype.configured = function () {
 // cb(err, json, status)
 HA.prototype.request = function (method, path, body, cb) {
   if (!this.configured()) {
-    cb(new Error('Set the Home Assistant URL and token in the app settings'));
+    cb(new Error(tr('needUrlToken')));
     return;
   }
   var xhr = new XMLHttpRequest();
@@ -40,15 +42,15 @@ HA.prototype.request = function (method, path, body, cb) {
     var status = xhr.status;
     var text = xhr.responseText;
     if (!status) {
-      finish(new Error('Cannot reach Home Assistant'), null, 0);
+      finish(new Error(tr('unreachable')), null, 0);
       return;
     }
     var json = null;
     try { json = text ? JSON.parse(text) : null; } catch (e) { json = null; }
-    if (status === 401) finish(new Error('Home Assistant rejected the token (401)'), json, status);
-    else if (status === 404) finish(new Error('Not found (404): ' + path), json, status);
-    else if (status === 400) finish(new Error('Bad request (400)' + (json && json.message ? ': ' + json.message : '')), json, status);
-    else if (status >= 300) finish(new Error('Home Assistant error ' + status + (json && json.message ? ': ' + json.message : '')), json, status);
+    if (status === 401) finish(new Error(tr('badToken')), json, status);
+    else if (status === 404) finish(new Error(tr('notFound', { path: path })), json, status);
+    else if (status === 400) finish(new Error(tr('badRequest') + (json && json.message ? ': ' + json.message : '')), json, status);
+    else if (status >= 300) finish(new Error(tr('haError', { status: status }) + (json && json.message ? ': ' + json.message : '')), json, status);
     else finish(null, json, status);
   }
   try {
@@ -59,10 +61,10 @@ HA.prototype.request = function (method, path, body, cb) {
       if (xhr.readyState === 4) onDone();
     };
     xhr.onload = onDone;
-    xhr.onerror = function () { finish(new Error('Cannot reach Home Assistant'), null, 0); };
+    xhr.onerror = function () { finish(new Error(tr('unreachable')), null, 0); };
     timer = setTimeout(function () {
       try { xhr.abort(); } catch (e) { /* ignore */ }
-      finish(new Error('Home Assistant timed out'), null, 0);
+      finish(new Error(tr('timedOut')), null, 0);
     }, this.timeoutMs);
     xhr.send(body === undefined || body === null ? null : JSON.stringify(body));
   } catch (e) {

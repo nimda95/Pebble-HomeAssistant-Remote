@@ -23,8 +23,6 @@ typedef struct {
   char toast[128];
   uint8_t toast_kind;
   bool toast_visible;
-
-  char status[96];  // shown while there is no layout
 } App;
 
 extern App g;
@@ -37,4 +35,5 @@ void app_on_toast(const char *text, uint8_t kind);
 void app_on_value(int page, uint8_t elem_id, uint8_t value);
 void app_on_goto(int page);
 void app_on_dictate(int page, uint8_t elem_id, uint8_t part, const char *prompt);
+void app_on_lang(void);
 void app_show_toast(const char *text, uint8_t kind, uint32_t ms);

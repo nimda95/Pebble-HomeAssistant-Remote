@@ -203,6 +203,27 @@ ships under `/static/mdi/`) and caches them. The app connects to nothing but Hom
 `Internet` and `LocalNetwork` permissions (manifest version 2), so a Home Assistant URL on your
 home network or on the internet both work, and no location or timeline access is requested.
 
+## Languages
+
+The watch, the toasts and the settings page are available in English, French, Arabic, Turkish,
+German, Dutch, Spanish and Indonesian. **Language** in the settings defaults to *Automatic*: the
+watch follows its system language and the settings page the phone's. Pick a language there to
+use it on both. Your own labels and page names from the YAML are never translated.
+
+The watch shows English when its font can't draw the language: Arabic needs firmware 4.20 or
+later with an Arabic language pack, and Turkish letters (ğ, ı, ş) need a font that has them. The
+watch checks this itself and the settings page says so.
+
+To add a language:
+
+1. Copy `src/pkjs/lang/en.js` to `src/pkjs/lang/<code>.js` and translate it (phone messages and
+   the settings page; keep `{placeholders}`, `<code>` and `` `backtick` `` parts as they are).
+2. Add the code to `LANGS` and `NAMES` in `src/pkjs/lib/i18n.js`, and the same code, in the same
+   position, to `LANG_CODES`, the `L_…` enum and the `STRS` table in `src/c/i18n.c` (the
+   watch's own strings).
+3. `npm run gen` (packs the translations into `src/pkjs/generated/strings.js`), then `npm test`:
+   it checks that every language has every string.
+
 ## How it works
 
 ```
@@ -226,15 +247,15 @@ home network or on the internet both work, and no location or timeline access is
   can lose PebbleKit JS storage when it's killed. The phone restores from that copy
   automatically.
 - **Settings page (`config/`)** is bundled by esbuild, gzipped and embedded as base64
-  (`src/pkjs/generated/config_page.js`, about 50 KB). When opened, the phone inflates it with a
+  (`src/pkjs/generated/config_page.js`, about 55 KB). When opened, the phone inflates it with a
   small built-in inflater (`lib/inflate.js`; iOS has no `DecompressionStream`), injects your
   settings and opens it as a `data:` URL. The preview decodes the exact bytes the watch gets.
 
 ## Development
 
 ```sh
-npm test              # unit tests (config compiler, actions, layout/pack, inflate, templates)
-npm run gen           # rebuild generated assets + settings page
+npm test              # unit tests (config compiler, actions, layout/pack, inflate, templates, translations)
+npm run gen           # rebuild generated assets, translations + settings page
 npm run preview       # also writes config/preview.html to open in a desktop browser
 npm run import-urc -- /path/to/universal-remote-card   # refresh key maps from a card checkout
 npm run icon          # regenerate the launcher icon

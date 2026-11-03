@@ -82,6 +82,8 @@ async function main() {
       ],
       iconCache: {},
       assets,
+      strings: require(path.join(gen, 'strings.js')),
+      watch: { locale: 'en_US', shown: null },
     };
     const page = replaceOnce(html, '"__PEBBLE_INIT__"', JSON.stringify(init).replace(/</g, '\\u003c'));
     fs.writeFileSync(path.join(root, 'config/preview.html'), page);

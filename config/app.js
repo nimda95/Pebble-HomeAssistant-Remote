@@ -8,11 +8,20 @@ var inflate = require('../src/pkjs/lib/inflate');
 var modelLib = require('../src/pkjs/lib/model');
 var packLib = require('../src/pkjs/lib/pack');
 var layoutLib = require('../src/pkjs/lib/layout');
+var i18n = require('../src/pkjs/lib/i18n');
 var Preview = require('./preview');
 var templates = require('./templates');
 
 var init = window.__PEBBLE_INIT__;
 if (!init || typeof init !== 'object') init = window.__PEBBLE_DEV_INIT__ || {};
+
+// Translations other than English come from the phone (src/pkjs/generated/strings.js).
+try {
+  i18n.loadPacked(init.strings);
+} catch (e) {
+  console.log('translations not loaded: ' + e);
+}
+var T = i18n.tp;
 
 var assets = JSON.parse(inflate.gunzipBase64ToString(init.assets));
 // Icons that aren't bundled come from the phone, which loads them from Home
@@ -75,6 +84,10 @@ function iconPath(icon) {
   return assets.brand[icon] || null;
 }
 
+function each(selector, fn) {
+  Array.prototype.forEach.call(document.querySelectorAll(selector), fn);
+}
+
 function debounce(fn, ms) {
   var t;
   return function () {
@@ -100,11 +113,11 @@ function showProblems(errors, warnings) {
 function problem(p, kind) {
   var msg = typeof p === 'string' ? p : p.message;
   var row = el('div', { className: 'problem ' + kind }, [
-    el('span', { className: 'badge', text: kind === 'error' ? 'Error' : 'Note' }),
+    el('span', { className: 'badge', text: T(kind === 'error' ? 'error' : 'note') }),
     el('span', { className: 'msg', text: msg }),
   ]);
   if (p && p.line) {
-    row.appendChild(el('button', { className: 'link', text: 'Line ' + p.line, onclick: function () { gotoLine(p.line); } }));
+    row.appendChild(el('button', { className: 'link', text: T('line', { n: p.line }), onclick: function () { gotoLine(p.line); } }));
   }
   return row;
 }
@@ -153,19 +166,19 @@ function update() {
           if (m && iconCache[m[2]] === undefined) later.push(k);
           else unknown.push(k);
         });
-        if (later.length) warnings.push('Loaded from Home Assistant after saving: ' + later.join(', '));
-        if (unknown.length) warnings.push('Unknown icons (label shown instead): ' + unknown.join(', '));
+        if (later.length) warnings.push(T('iconsLater', { icons: later.join(', ') }));
+        if (unknown.length) warnings.push(T('iconsUnknown', { icons: unknown.join(', ') }));
       }
-      if (packed.bytes.length > 150000) errors.push('Layout is too big for the watch (' + Math.round(packed.bytes.length / 1024) + ' KB). Use fewer pages or icons.');
+      if (packed.bytes.length > 150000) errors.push(T('tooBig', { kb: Math.round(packed.bytes.length / 1024) }));
     } catch (e) {
-      errors.push('Layout: ' + e.message);
+      errors.push(T('layoutProblem', { msg: e.message }));
     }
   }
   state.valid = !errors.length && !!packed;
   state.config = config;
   showProblems(errors, warnings);
   $('save').disabled = !state.valid;
-  $('saveHint').textContent = state.valid ? '' : 'Fix the errors above to save';
+  $('saveHint').textContent = state.valid ? '' : T('fixErrors');
   if (state.valid) {
     state.model = model;
     state.packed = packed;
@@ -202,7 +215,7 @@ function showPage(i) {
   });
   var pg = state.model.pages[i];
   var ents = [pg.ctx.entity_id, pg.ctx.remote_id, pg.ctx.media_player_id].filter(function (v, i, a) { return v && a.indexOf(v) === i; });
-  $('pageInfo').textContent = [pg.ctx.platform || 'No platform'].concat(ents).join(' · ');
+  $('pageInfo').textContent = [pg.ctx.platform || T('noPlatform')].concat(ents).join(' · ');
   inspectButtons(pg);
   if ($('platformSel').dataset.touched !== '1' && pg.ctx.platformId) {
     $('platformSel').value = pg.ctx.platformId;
@@ -217,41 +230,55 @@ function describeAction(a) {
   if (Array.isArray(a)) return a.map(describeAction).join(' → ');
   if (typeof a !== 'object') return String(a);
   switch (a.action) {
-    case 'key': return 'key ' + a.key;
-    case 'source': return 'open ' + a.source;
+    case 'key': return T('actKey', { key: a.key });
+    case 'source': return T('actOpen', { source: a.source });
     case 'perform-action':
     case 'call-service': return (a.perform_action || a.service) + (a.data ? ' ' + JSON.stringify(a.data) : '');
     case 'page': {
       var pg = a.page === undefined ? 'next' : String(a.page);
-      if (pg === 'next') return 'next page';
-      if (pg === 'previous' || pg === 'prev') return 'previous page';
-      return 'go to page ' + pg;
+      if (pg === 'next') return T('actNextPage');
+      if (pg === 'previous' || pg === 'prev') return T('actPrevPage');
+      return T('actGotoPage', { page: pg });
     }
-    case 'repeat': return 'repeat while held';
+    case 'repeat': return T('actRepeat');
     case 'toggle': {
       var t = (a.target && a.target.entity_id) || (a.data && a.data.entity_id);
-      return 'toggle ' + (t ? [].concat(t).join(', ') : 'page entity');
+      return T('actToggle', { target: t ? [].concat(t).join(', ') : T('actPageEntity') });
     }
     case 'keyboard':
     case 'textbox':
-    case 'search': return a.action + ' (dictate on the watch)';
+    case 'search': return T('actDictate', { action: a.action });
     default: return a.action || JSON.stringify(a);
   }
 }
 
+// The `action` of a single action, or of the first/last one of a list.
+function kindOf(a, last) {
+  if (Array.isArray(a)) a = a[last ? a.length - 1 : 0];
+  return a && typeof a === 'object' ? a.action : undefined;
+}
+
+var ROW_KEYS = {
+  center: ['tap', 'hold', 'doubleTap'],
+  up: ['swipeUp', 'holdUp', 'doubleUp'],
+  down: ['swipeDown', 'holdDown', 'doubleDown'],
+  left: ['swipeLeft', 'holdLeft', 'doubleLeft'],
+  right: ['swipeRight', 'holdRight', 'doubleRight'],
+};
+
 function actionRows(parts) {
   var rows = [];
-  var names = { center: '', up: 'Up ', down: 'Down ', left: 'Left ', right: 'Right ' };
   Object.keys(parts).forEach(function (k) {
     var p = parts[k];
     if (!p) return;
-    var prefix = names[k] || '';
+    var names = ROW_KEYS[k] || ROW_KEYS.center;
     var t = describeAction(p.tap), h = describeAction(p.hold), d = describeAction(p.double);
-    var hold = prefix ? prefix + 'hold' : 'Hold';
-    if (t) rows.push([prefix + (k === 'center' ? 'Tap' : 'swipe'), t]);
+    var hold = T(names[1]);
+    var isPage = kindOf(p.tap) === 'page' || kindOf(p.tap, true) === 'page';
+    if (t) rows.push([T(names[0]), t]);
     if (h) rows.push([hold, h]);
-    else if (t && !/page$|^go to page/.test(t)) rows.push([hold, /^key /.test(t) ? t + ' (long press)' : t]);
-    if (d) rows.push([prefix ? prefix + 'double tap' : 'Double tap', d]);
+    else if (t && !isPage) rows.push([hold, kindOf(p.tap) === 'key' ? T('longPress', { action: t }) : t]);
+    if (d) rows.push([T(names[2]), d]);
   });
   return rows;
 }
@@ -267,17 +294,21 @@ function table(rows) {
 function inspectButtons(pg) {
   var box = $('inspect');
   box.innerHTML = '';
-  box.appendChild(el('div', { className: 'insp-title', text: 'Watch buttons' }));
+  box.appendChild(el('div', { className: 'insp-title', text: T('watchButtons') }));
   var rows = [];
-  [['Select', pg.buttons.select], ['Up', pg.buttons.up], ['Down', pg.buttons.down]].forEach(function (b) {
-    if (!b[1]) { rows.push([b[0], 'nothing']); return; }
-    var p = b[1].parts.center;
-    rows.push([b[0], describeAction(p.tap) || 'nothing']);
-    if (p.hold) rows.push([b[0] + ' hold', describeAction(p.hold)]);
-    if (p.double) rows.push([b[0] + ' double', describeAction(p.double)]);
+  [
+    [pg.buttons.select, 'btnSelect', 'btnSelectHold', 'btnSelectDouble'],
+    [pg.buttons.up, 'btnUp', 'btnUpHold', 'btnUpDouble'],
+    [pg.buttons.down, 'btnDown', 'btnDownHold', 'btnDownDouble'],
+  ].forEach(function (b) {
+    if (!b[0]) { rows.push([T(b[1]), T('nothing')]); return; }
+    var p = b[0].parts.center;
+    rows.push([T(b[1]), describeAction(p.tap) || T('nothing')]);
+    if (p.hold) rows.push([T(b[2]), describeAction(p.hold)]);
+    if (p.double) rows.push([T(b[3]), describeAction(p.double)]);
   });
   box.appendChild(table(rows));
-  box.appendChild(el('div', { className: 'hint', text: 'Tap an element in the preview to see what it does.' }));
+  box.appendChild(el('div', { className: 'hint', text: T('inspectHint') }));
 }
 
 function inspectElement(index) {
@@ -288,21 +319,21 @@ function inspectElement(index) {
   box.innerHTML = '';
   var title = el('div', { className: 'insp-title' }, [
     svgIcon(iconPath(m.icon)),
-    el('span', { text: m.name || '(inline)' }),
+    el('span', { text: m.name || T('inline') }),
     el('span', { className: 'type', text: m.type }),
   ]);
   box.appendChild(title);
   var rows;
   if (m.type === 'slider') {
     rows = [
-      ['Value', (m.entity_id || '?') + ' · ' + m.value_attribute + ' · ' + m.range[0] + '–' + m.range[1] + (m.unit || '')],
-      ['Release', describeAction(m.parts.center && m.parts.center.tap) || 'nothing'],
+      [T('value'), (m.entity_id || '?') + ' · ' + m.value_attribute + ' · ' + m.range[0] + '–' + m.range[1] + (m.unit || '')],
+      [T('release'), describeAction(m.parts.center && m.parts.center.tap) || T('nothing')],
     ];
   } else {
     rows = actionRows(m.parts);
   }
-  if (m.drag) rows.push([m.type === 'circlepad' ? 'Spin ring' : 'Drag', describeAction(m.drag)]);
-  if (!rows.length) rows.push(['', 'No actions']);
+  if (m.drag) rows.push([T(m.type === 'circlepad' ? 'spinRing' : 'drag'), describeAction(m.drag)]);
+  if (!rows.length) rows.push(['', T('noActions')]);
   box.appendChild(table(rows));
   box.appendChild(el('div', { className: 'hint', text: placed.w + '×' + placed.h + ' px' }));
 }
@@ -341,7 +372,7 @@ function insertAtCursor(text) {
   ta.value = before + sep + text + ta.value.slice(e);
   var pos = s + sep.length + text.length;
   ta.setSelectionRange(pos, pos);
-  flashMsg('Inserted ' + text);
+  flashMsg(T('inserted', { text: text }));
   update();
 }
 
@@ -361,23 +392,23 @@ function renderKeys() {
   var lib = modelLib.platformLibrary(assets, pid);
   var shorthands = ['volume_buttons', 'navigation_buttons', 'dpad', 'numpad', 'dialpad', 'xpad', 'npad'];
   var groups = [
-    ['Keys', pid === 'generic_remote' ? Object.keys(lib).map(function (k) { return lib[k]; }) : plat.keys],
-    ['Apps', plat.sources],
+    ['keys', pid === 'generic_remote' ? Object.keys(lib).map(function (k) { return lib[k]; }) : plat.keys],
+    ['apps', plat.sources],
   ];
   var box = $('keys');
   box.innerHTML = '';
   var shown = 0;
   groups.forEach(function (g) {
     var items = (g[1] || []).filter(function (e) {
-      if (!e || !e.name || shorthands.indexOf(e.name) >= 0 && g[0] === 'Apps') return false;
+      if (!e || !e.name || shorthands.indexOf(e.name) >= 0 && g[0] === 'apps') return false;
       return !q || e.name.toLowerCase().indexOf(q) >= 0 || describeAction(e.tap_action || '') && String(describeAction(e.tap_action)).toLowerCase().indexOf(q) >= 0;
     });
     if (!items.length) return;
-    box.appendChild(el('div', { className: 'group', text: g[0] + ' (' + items.length + ')' }));
+    box.appendChild(el('div', { className: 'group', text: T(g[0]) + ' (' + items.length + ')' }));
     var wrap = el('div', { className: 'chips' });
     items.forEach(function (e) {
       var isShort = shorthands.indexOf(e.name) >= 0;
-      var desc = isShort ? 'layout shortcut' : e.type && e.type !== 'button' ? e.type : describeAction(e.tap_action) || '';
+      var desc = isShort ? T('layoutShortcut') : e.type && e.type !== 'button' ? e.type : describeAction(e.tap_action) || '';
       wrap.appendChild(el('button', {
         className: 'chip',
         title: desc,
@@ -391,24 +422,39 @@ function renderKeys() {
     return !q || e.id.toLowerCase().indexOf(q) >= 0 || (e.name || '').toLowerCase().indexOf(q) >= 0;
   });
   if (ents.length) {
-    box.appendChild(el('div', { className: 'group', text: 'Your entities (' + ents.length + ')' }));
+    box.appendChild(el('div', { className: 'group', text: T('yourEntities') + ' (' + ents.length + ')' }));
     var ew = el('div', { className: 'chips' });
     ents.slice(0, 200).forEach(function (e) {
       ew.appendChild(el('button', { className: 'chip ent', title: e.name, onclick: function () { insertAtCursor(e.id); } }, [el('span', { text: e.id })]));
     });
     box.appendChild(ew);
   }
-  if (!shown && !ents.length) box.appendChild(el('div', { className: 'hint', text: 'Nothing matches.' }));
+  if (!shown && !ents.length) box.appendChild(el('div', { className: 'hint', text: T('nothingMatches') }));
 }
 
 // ---------------------------------------------------------------------------- templates
 
+function templateLabel(t) {
+  if (t.id === 'climate') return T('tplClimate');
+  if (t.id === 'speaker') return T('tplSpeaker');
+  return T('tplPlatform', { name: modelLib.PLATFORM_NAMES[t.id] || t.id });
+}
+
+// (Re)fills the template menu in the page language.
+function templateOptions() {
+  var sel = $('templateSel');
+  var value = sel.value;
+  sel.innerHTML = '';
+  sel.appendChild(el('option', { value: '', text: T('templatesMenu') }));
+  sel.appendChild(el('option', { value: '__default', text: T('tplExample') }));
+  templates.list().forEach(function (t) { sel.appendChild(el('option', { value: t.id, text: templateLabel(t) })); });
+  sel.value = value;
+}
+
 function renderTemplates() {
   var sel = $('templateSel');
   var items = templates.list();
-  sel.appendChild(el('option', { value: '', text: 'Templates…' }));
-  sel.appendChild(el('option', { value: '__default', text: 'Example: TV, AC and TV box' }));
-  items.forEach(function (t) { sel.appendChild(el('option', { value: t.id, text: t.label })); });
+  templateOptions();
   var chosen = null;
   var yamlFor = function (id) {
     if (id === '__default') return init.defaultYaml || '';
@@ -423,7 +469,7 @@ function renderTemplates() {
     try { root = yaml.load($('yaml').value); } catch (e) { root = undefined; }
     var canAdd = Array.isArray(root) || root === null || root === undefined && !$('yaml').value.trim();
     $('templateAdd').disabled = !canAdd || chosen === '__default';
-    $('templateHint').textContent = canAdd || chosen === '__default' ? '' : 'Adding pages needs the YAML to be a list of pages.';
+    $('templateHint').textContent = canAdd || chosen === '__default' ? '' : T('tplNeedsList');
   });
   function apply(replace) {
     if (!chosen) return;
@@ -438,7 +484,7 @@ function renderTemplates() {
     autosize();
     update();
     if (state.model) showPage(replace ? 0 : Math.min(before, state.model.pages.length - 1));
-    flashMsg(replace ? 'Template loaded' : 'Pages added — replace the my_… entity ids');
+    flashMsg(T(replace ? 'tplLoaded' : 'tplAdded'));
   }
   $('templateAdd').addEventListener('click', function () { apply(false); });
   $('templateReplace').addEventListener('click', function () { apply(true); });
@@ -489,7 +535,7 @@ function save() {
   update();
   if (!state.valid) return;
   var payload = {
-    settings: { url: $('url').value.trim(), token: $('token').value.trim() },
+    settings: { url: $('url').value.trim(), token: $('token').value.trim(), lang: $('langSel').value },
     yaml: $('yaml').value,
     config: state.config,
   };
@@ -500,6 +546,56 @@ function cancel() {
   location.href = returnUrl();
 }
 
+// ---------------------------------------------------------------------------- language
+
+// Puts every static text of the page in the current language.
+function applyStatic() {
+  var code = i18n.getLang();
+  document.documentElement.lang = code;
+  document.documentElement.dir = i18n.RTL[code] ? 'rtl' : 'ltr';
+  document.title = T('pageTitle');
+  each('[data-i18n]', function (e) { e.textContent = T(e.getAttribute('data-i18n')); });
+  each('[data-i18n-html]', function (e) { e.innerHTML = T(e.getAttribute('data-i18n-html')); });
+  each('[data-i18n-ph]', function (e) { e.placeholder = T(e.getAttribute('data-i18n-ph')); });
+  each('[data-i18n-aria]', function (e) { e.setAttribute('aria-label', T(e.getAttribute('data-i18n-aria'))); });
+  $('showToken').textContent = T($('token').type === 'password' ? 'show' : 'hide');
+  var auto = $('langSel').options[0];
+  if (auto) auto.textContent = T('langAuto');
+}
+
+// Tells when the watch will show English instead of the chosen language.
+function langNote() {
+  var v = $('langSel').value;
+  var w = init.watch || {};
+  var wanted = v === 'auto' ? i18n.fromLocale(w.locale) : v;
+  var text = '';
+  if (wanted && w.shown && w.shown.indexOf(wanted) < 0) text = T('langMissing', { lang: i18n.NAMES[wanted] });
+  else if (wanted === 'ar' && !w.shown) text = T('langArabic');
+  $('langNote').textContent = text;
+  $('langNote').hidden = !text;
+}
+
+// The page follows the Language setting, or the phone's language when it is Automatic.
+function setPageLang() {
+  i18n.setLang(i18n.resolve($('langSel').value, navigator.language));
+  applyStatic();
+  langNote();
+}
+
+function setupLang(value) {
+  var sel = $('langSel');
+  sel.appendChild(el('option', { value: 'auto', text: '' }));
+  i18n.LANGS.forEach(function (c) { sel.appendChild(el('option', { value: c, lang: c, text: i18n.NAMES[c] })); });
+  sel.value = i18n.setting(value);
+  sel.addEventListener('change', function () {
+    setPageLang();
+    templateOptions();
+    update();
+    renderKeys();
+  });
+  setPageLang();
+}
+
 // ---------------------------------------------------------------------------- boot
 
 function boot() {
@@ -507,10 +603,11 @@ function boot() {
   var settings = init.settings || {};
   $('url').value = settings.url || '';
   $('token').value = settings.token || '';
+  setupLang(settings.lang);
   $('showToken').addEventListener('click', function () {
     var t = $('token');
     t.type = t.type === 'password' ? 'text' : 'password';
-    $('showToken').textContent = t.type === 'password' ? 'Show' : 'Hide';
+    $('showToken').textContent = T(t.type === 'password' ? 'show' : 'hide');
   });
   $('version').textContent = 'v' + (init.version || 'dev');
 

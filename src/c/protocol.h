@@ -2,7 +2,7 @@
 // AppMessage protocol. Keep in sync with src/pkjs/lib/protocol.js and src/pkjs/lib/actions.js.
 
 // watch -> phone
-#define CMD_HELLO 1
+#define CMD_HELLO 1  // value: bit 0 has backup, bit 1 + i language i can be drawn; text: locale
 #define CMD_EVENT 2
 #define CMD_PAGE_SHOWN 3
 #define CMD_BACKUP_DATA 4
@@ -20,6 +20,7 @@
 #define CMD_BACKUP_CHUNK 19
 #define CMD_BACKUP_END 20
 #define CMD_BACKUP_REQUEST 21
+#define CMD_LANG 22  // text: language setting ("auto", "fr", ...)
 
 #define TOAST_INFO 0
 #define TOAST_OK 1

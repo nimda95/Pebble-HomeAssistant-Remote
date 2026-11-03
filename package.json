@@ -9,7 +9,7 @@
   "private": true,
   "scripts": {
     "import-urc": "node tools/import-urc.js",
-    "gen": "node tools/build-assets.js && node tools/build-config-page.js",
+    "gen": "node tools/build-assets.js && node tools/build-strings.js && node tools/build-config-page.js",
     "build": "npm run gen && pebble build",
     "test": "node --test test/*.test.js",
     "preview": "node tools/build-config-page.js --preview",

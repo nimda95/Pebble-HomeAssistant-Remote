@@ -3,6 +3,8 @@
 // Shared by the phone-side app and the config page preview.
 'use strict';
 
+var tr = require('./i18n').t;
+
 // Display names as used by universal-remote-card's `platform` option.
 var PLATFORM_NAMES = {
   android_tv: 'Android TV',
@@ -139,7 +141,7 @@ function num(v, d) {
 function normalizeElement(model, page, name, cfg) {
   var type = (cfg.type || 'button').toLowerCase();
   if (['button', 'touchpad', 'circlepad', 'slider'].indexOf(type) < 0) {
-    warn(model, 'Unknown element type "' + cfg.type + '" for "' + name + '", using button');
+    warn(model, tr('unknownType', { type: cfg.type, name: name }));
     type = 'button';
   }
   var ctx = page.ctx;
@@ -169,7 +171,7 @@ function normalizeElement(model, page, name, cfg) {
     var lo = num(range[0], 0), hi = num(range[1], 1);
     if (typeof range[0] === 'string' || typeof range[1] === 'string') {
       if (!isFinite(parseFloat(range[0])) || !isFinite(parseFloat(range[1]))) {
-        warn(model, 'Slider "' + name + '": templated range is not supported, using [' + lo + ', ' + hi + ']');
+        warn(model, tr('templatedRange', { name: name, lo: lo, hi: hi }));
       }
     }
     el.range = [lo, hi];
@@ -227,7 +229,7 @@ function leaf(model, page, item) {
   var nm = String(item);
   var cfg2 = lookup(model, page, nm);
   if (!cfg2) {
-    warn(model, 'Page "' + page.name + '": unknown element "' + nm + '" (shown as empty space)');
+    warn(model, tr('unknownElement', { page: page.name, name: nm }));
     return spacer(page);
   }
   if (!cfg2.tap_action && !cfg2.hold_action && !cfg2.double_tap_action && cfg2.type !== 'slider' &&
@@ -296,7 +298,7 @@ function hwButton(model, page, spec, fallback) {
   if (typeof spec === 'string') {
     cfg = lookup(model, page, spec);
     if (!cfg) {
-      warn(model, 'Page "' + page.name + '": button mapped to unknown element "' + spec + '"');
+      warn(model, tr('unknownButton', { page: page.name, name: spec }));
       return null;
     }
     if (cfg.type === 'touchpad' || cfg.type === 'circlepad' || cfg.type === 'slider') {
@@ -322,12 +324,12 @@ function toObjList(list, model, where) {
   var out = {};
   if (list === undefined || list === null) return out;
   if (!Array.isArray(list)) {
-    warn(model, where + ' custom_actions must be a list');
+    warn(model, tr('customList', { where: where }));
     return out;
   }
   list.forEach(function (c) {
     if (isObj(c) && c.name) out[c.name] = c;
-    else warn(model, where + ': custom action without a name ignored');
+    else warn(model, tr('customNoName', { where: where }));
   });
   return out;
 }
@@ -344,11 +346,11 @@ function readStyle(model, src, where) {
   if (src.show_title !== undefined) out.show_title = src.show_title;
   if (src.style !== undefined) {
     if (!isObj(src.style)) {
-      warn(model, where + ': `style` must be a mapping');
+      warn(model, tr('styleMapping', { where: where }));
     } else {
       Object.keys(src.style).forEach(function (k) {
         var key = STYLE_ALIASES[k] || k;
-        if (STYLE_KEYS.indexOf(key) < 0) warn(model, where + ': unknown style option "' + k + '"');
+        if (STYLE_KEYS.indexOf(key) < 0) warn(model, tr('unknownStyle', { where: where, name: k }));
         else out[key] = src.style[k];
       });
     }
@@ -359,7 +361,7 @@ function readStyle(model, src, where) {
 function finishStyle(model, s, where) {
   var theme = s.theme === undefined ? 'dark' : String(s.theme).toLowerCase();
   if (theme !== 'dark' && theme !== 'light') {
-    warn(model, where + ': theme must be dark or light');
+    warn(model, tr('badTheme', { where: where }));
     theme = 'dark';
   }
   return {
@@ -402,35 +404,35 @@ function compile(config, assets) {
     if (Array.isArray(config.pages)) {
       pageCfgs = config.pages;
     } else if (config.pages !== undefined) {
-      model.errors.push('`pages` must be a list.');
+      model.errors.push(tr('pagesList'));
       return model;
     } else if (config.rows !== undefined) {
       pageCfgs = [{ name: config.title || 'Remote', rows: config.rows }];
     } else {
-      model.errors.push('The config should be a list of pages, each with a `name` and `rows`.');
+      model.errors.push(tr('notPages'));
       return model;
     }
   } else {
-    model.errors.push('The config should be a list of pages, each with a `name` and `rows`.');
+    model.errors.push(tr('notPages'));
     return model;
   }
 
   model.options.start_page = defaults.start_page;
-  model.custom = toObjList(defaults.custom_actions, model, 'Top-level');
+  model.custom = toObjList(defaults.custom_actions, model, tr('whereTop'));
   var addIcons = function (list) {
     (Array.isArray(list) ? list : []).forEach(function (ci) {
       if (isObj(ci) && ci.name && ci.path) model.customIcons[ci.name] = ci.path;
     });
   };
   addIcons(defaults.custom_icons);
-  var baseStyle = readStyle(model, defaults, 'Top-level');
+  var baseStyle = readStyle(model, defaults, tr('whereTop'));
 
   pageCfgs.forEach(function (pc, idx) {
     if (!isObj(pc)) {
-      model.errors.push('Page ' + (idx + 1) + ' must be a mapping with `name` and `rows`.');
+      model.errors.push(tr('pageMapping', { n: idx + 1 }));
       return;
     }
-    var where = 'Page "' + String(pc.name || pc.title || idx + 1) + '"';
+    var where = tr('wherePage', { name: String(pc.name || pc.title || idx + 1) });
     var pick = function (key) { return pc[key] !== undefined ? pc[key] : defaults[key]; };
     var page = {
       index: model.pages.length,
@@ -455,7 +457,7 @@ function compile(config, assets) {
     if (page.ctx.platform !== undefined && page.ctx.platform !== null && page.ctx.platform !== '') {
       pid = platformId(page.ctx.platform);
       if (!pid) {
-        warn(model, where + ': unknown platform "' + page.ctx.platform + '", using Android TV');
+        warn(model, tr('unknownPlatform', { where: where, name: page.ctx.platform }));
         pid = 'android_tv';
       }
     } else if (explicitDevice) {
@@ -476,7 +478,7 @@ function compile(config, assets) {
     var rows = pc.rows;
     if (rows === undefined || rows === null) rows = [];
     if (!Array.isArray(rows)) {
-      model.errors.push(where + ': `rows` must be a list.');
+      model.errors.push(tr('rowsList', { where: where }));
       rows = [];
     }
     // Top level: each entry is a row (a bare string is a one-element row).
@@ -501,7 +503,7 @@ function compile(config, assets) {
     model.pages.push(page);
   });
 
-  if (!model.pages.length && !model.errors.length) model.errors.push('No pages defined.');
+  if (!model.pages.length && !model.errors.length) model.errors.push(tr('noPages'));
   return model;
 }
 

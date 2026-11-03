@@ -1,5 +1,6 @@
 #include "render.h"
 #include "app.h"
+#include "i18n.h"
 #include "protocol.h"
 
 // Keep the drawing rules in sync with config/preview.js, which mirrors them for the
@@ -377,7 +378,7 @@ void render_update_proc(Layer *layer, GContext *ctx) {
     graphics_draw_text(ctx, "HA Remote", s_f24, GRect(0, bounds.size.h / 2 - 50, bounds.size.w, 30),
                        GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
     graphics_context_set_text_color(ctx, GColorLightGray);
-    graphics_draw_text(ctx, g.status, s_f18, GRect(16, bounds.size.h / 2 - 14, bounds.size.w - 32, 80),
+    graphics_draw_text(ctx, _(STR_CONNECTING), s_f18, GRect(16, bounds.size.h / 2 - 14, bounds.size.w - 32, 80),
                        GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
     if (g.toast_visible) draw_toast(ctx, bounds);
     return;

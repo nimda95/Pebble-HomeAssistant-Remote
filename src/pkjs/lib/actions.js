@@ -4,6 +4,7 @@
 
 var modelLib = require('./model');
 var template = require('./template');
+var tr = require('./i18n').t;
 
 // Watch gesture codes (keep in sync with src/c/protocol.h).
 var G = { TAP: 0, HOLD: 1, DOUBLE: 2, REPEAT: 3, SLIDE: 4, DRAG: 5, ROTATE: 6, TEXT: 7 };
@@ -68,10 +69,11 @@ function entityOf(target, ctx) {
 
 // Platform for key/source/keyboard actions: the action's, else the page's. A page without a
 // platform (an AC, lights, ...) has none, unless it has a remote or media player.
-function platformOf(action, ctx, what) {
+// `msgKey`: the message for a page without a platform.
+function platformOf(action, ctx, msgKey) {
   var name = action.platform || ctx.platform;
   if (!name && !ctx.remote_id && !ctx.media_player_id && !ctx.keyboard_id) {
-    throw new Error(what + ' actions need a `platform` and `remote_id` (or `media_player_id`) on this page');
+    throw new Error(tr(msgKey));
   }
   return modelLib.platformId(name) || 'android_tv';
 }
@@ -91,7 +93,7 @@ function svc(domain, service, data) {
 }
 
 function need(value, what, platformName) {
-  if (!value) throw new Error('Set ' + what + (platformName ? ' for ' + platformName : ''));
+  if (!value) throw new Error(tr('needSetFor', { what: what, platform: platformName }));
   return value;
 }
 
@@ -100,10 +102,10 @@ function pick(action, ctx, key) {
 }
 
 function keySteps(action, ctx, holdFallback) {
-  var pid = platformOf(action, ctx, 'Key');
+  var pid = platformOf(action, ctx, 'needPlatformKey');
   var pname = modelLib.PLATFORM_NAMES[pid];
   var key = action.key;
-  if (key === undefined || key === null || key === '') throw new Error('Key action without `key`');
+  if (key === undefined || key === null || key === '') throw new Error(tr('keyWithoutKey'));
   var remote = pick(action, ctx, 'remote_id');
   var mp = pick(action, ctx, 'media_player_id');
   switch (pid) {
@@ -116,7 +118,7 @@ function keySteps(action, ctx, holdFallback) {
     case 'unfolded_circle':
       return [svc('unfoldedcircle', 'send_button_command', { entity_id: need(remote, 'remote_id', pname), button: key })];
     case 'unified_remote':
-      throw new Error('Unified Remote has no key action; use perform-action unified_remote.call');
+      throw new Error(tr('unifiedNoKey'));
     default: {
       var data = { entity_id: need(remote, 'remote_id', pname), command: key };
       if (holdFallback) data.hold_secs = 1;
@@ -127,10 +129,10 @@ function keySteps(action, ctx, holdFallback) {
 }
 
 function sourceSteps(action, ctx) {
-  var pid = platformOf(action, ctx, 'Source');
+  var pid = platformOf(action, ctx, 'needPlatformSource');
   var pname = modelLib.PLATFORM_NAMES[pid];
   var src = action.source;
-  if (src === undefined || src === null || src === '') throw new Error('Source action without `source`');
+  if (src === undefined || src === null || src === '') throw new Error(tr('sourceWithoutSource'));
   var remote = pick(action, ctx, 'remote_id');
   var mp = pick(action, ctx, 'media_player_id');
   switch (pid) {
@@ -152,7 +154,7 @@ function sourceSteps(action, ctx) {
     case 'jellyfin':
     case 'philips_tv':
     case 'denon_avr':
-      throw new Error(pname + ' has no source action');
+      throw new Error(tr('noSourceAction', { platform: pname }));
     default:
       return [svc('remote', 'turn_on', { entity_id: need(remote, 'remote_id', pname), activity: src })];
   }
@@ -163,16 +165,16 @@ var MP_DOMAINS = ['media_player', 'androidtv', 'kodi', 'denonavr', 'webostv'];
 
 function performSteps(action, ctx) {
   var name = action.perform_action || action.service;
-  if (!name || String(name).indexOf('.') < 1) throw new Error('perform-action needs `perform_action: domain.service`');
+  if (!name || String(name).indexOf('.') < 1) throw new Error(tr('performNeedsName'));
   var parts = String(name).split('.');
   var domain = parts[0], service = parts.slice(1).join('.');
   var data = action.data === undefined || action.data === null ? {} : action.data;
   var target = action.target === undefined || action.target === null ? {} : action.target;
   if (typeof data === 'string') {
-    try { data = JSON.parse(data); } catch (e) { throw new Error('`data` must be a mapping'); }
+    try { data = JSON.parse(data); } catch (e) { throw new Error(tr('dataMapping')); }
   }
   if (typeof target === 'string') {
-    try { target = JSON.parse(target); } catch (e) { throw new Error('`target` must be a mapping'); }
+    try { target = JSON.parse(target); } catch (e) { throw new Error(tr('targetMapping')); }
   }
   data = Object.assign({}, data);
   target = Object.assign({}, target);
@@ -195,7 +197,7 @@ function toggleSteps(action, ctx, target) {
   var ids = t.entity_id;
   if (!ids && !TARGET_KEYS.some(function (k) { return t[k] !== undefined; })) {
     ids = (target && target.entity_id) || ctx.entity_id;
-    if (!ids) throw new Error('toggle needs a target entity_id (or an entity_id on the page)');
+    if (!ids) throw new Error(tr('toggleNeedsTarget'));
   }
   if (!ids) return [svc('homeassistant', 'toggle', t)];
   if (!Array.isArray(ids)) ids = String(ids).split(',').map(function (s) { return s.trim(); });
@@ -221,7 +223,7 @@ function adbStep(entityId, command) {
 
 function keyboardSteps(action, ctx, text) {
   var kind = action.action; // keyboard | textbox | search
-  var pid = platformOf(action, ctx, 'Keyboard');
+  var pid = platformOf(action, ctx, 'needPlatformKeyboard');
   var pname = modelLib.PLATFORM_NAMES[pid];
   var remote = pick(action, ctx, 'remote_id');
   var mp = pick(action, ctx, 'media_player_id');
@@ -242,7 +244,7 @@ function keyboardSteps(action, ctx, text) {
         command: String(text).split('').map(function (ch) { return 'Lit_' + ch; }),
       })];
     case 'apple_tv':
-      if (kind === 'search') throw new Error('Apple TV has no search action');
+      if (kind === 'search') throw new Error(tr('noSearchAction', { platform: pname }));
       return [svc('apple_tv', 'set_keyboard_text', { config_entry_id: need(ctx.config_entry_id, 'config_entry_id', pname), text: text })];
     case 'webos':
       return [svc('webostv', 'command', { entity_id: need(mp, 'media_player_id', pname), command: 'com.webos.service.ime/insertText', payload: { text: text, replace: true } })];
@@ -257,7 +259,7 @@ function keyboardSteps(action, ctx, text) {
     case 'unified_remote':
       return [svc('unified_remote', 'call', { target: ctx.device, remote_id: 'Core.Input', action: 'Text', extras: { Values: [{ Value: text }] } })];
     default:
-      throw new Error(pname + ' has no keyboard support');
+      throw new Error(tr('noKeyboard', { platform: pname }));
   }
 }
 
@@ -295,8 +297,8 @@ function planAction(action, ctx, target, vars, holdFallback) {
     case undefined:
       return [];
     default:
-      if (UNSUPPORTED[kind]) throw new Error('"' + kind + '" actions are not available on the watch');
-      throw new Error('Unknown action "' + kind + '"');
+      if (UNSUPPORTED[kind]) throw new Error(tr('notOnWatch', { action: kind }));
+      throw new Error(tr('unknownAction', { action: kind }));
   }
 }
 

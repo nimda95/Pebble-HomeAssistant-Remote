@@ -4,6 +4,7 @@
 #include <pebble.h>
 #include "app.h"
 #include "comm.h"
+#include "i18n.h"
 #include "layout.h"
 #include "protocol.h"
 #include "render.h"
@@ -534,9 +535,20 @@ static void toast_cb(void *ctx) {
   redraw();
 }
 
+// Drops a UTF-8 character that a cut left incomplete at the end of `s`.
+static void utf8_trim_end(char *s) {
+  size_t n = strlen(s), i = n;
+  while (i > 0 && ((uint8_t)s[i - 1] & 0xC0) == 0x80) i--;
+  if (i == 0) return;
+  uint8_t lead = (uint8_t)s[i - 1];
+  size_t len = lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 1;
+  if (n - (i - 1) < len) s[i - 1] = 0;
+}
+
 void app_show_toast(const char *text, uint8_t kind, uint32_t ms) {
   strncpy(g.toast, text, sizeof(g.toast) - 1);
   g.toast[sizeof(g.toast) - 1] = 0;
+  if (strlen(text) >= sizeof(g.toast)) utf8_trim_end(g.toast);
   g.toast_kind = kind;
   g.toast_visible = true;
   if (s_toast_timer) app_timer_reschedule(s_toast_timer, ms);
@@ -589,12 +601,16 @@ void app_on_goto(int page) {
   goto_page(page, true);
 }
 
+void app_on_lang(void) {
+  redraw();
+}
+
 #if defined(PBL_MICROPHONE)
 static void dictation_cb(DictationSession *session, DictationSessionStatus status, char *text, void *ctx) {
   if (status == DictationSessionStatusSuccess && text && text[0]) {
     comm_send_event(s_dict_target.page, s_dict_target.elem, s_dict_target.part, G_TEXT, 0, text);
   } else if (status != DictationSessionStatusFailureTranscriptionRejected) {
-    app_show_toast("Dictation unavailable", TOAST_ERROR, 2500);
+    app_show_toast(_(STR_NO_DICTATION), TOAST_ERROR, 2500);
   }
 }
 #endif
@@ -603,7 +619,7 @@ void app_on_dictate(int page, uint8_t elem_id, uint8_t part, const char *prompt)
 #if defined(PBL_MICROPHONE)
   if (!s_dictation) s_dictation = dictation_session_create(256, dictation_cb, NULL);
   if (!s_dictation) {
-    app_show_toast("Dictation unavailable", TOAST_ERROR, 2500);
+    app_show_toast(_(STR_NO_DICTATION), TOAST_ERROR, 2500);
     return;
   }
   s_dict_target.page = page;
@@ -612,7 +628,7 @@ void app_on_dictate(int page, uint8_t elem_id, uint8_t part, const char *prompt)
   dictation_session_enable_confirmation(s_dictation, true);
   dictation_session_start(s_dictation);
 #else
-  app_show_toast("This watch has no microphone", TOAST_ERROR, 2500);
+  app_show_toast(_(STR_NO_MIC), TOAST_ERROR, 2500);
 #endif
 }
 
@@ -635,7 +651,7 @@ static void window_appear(Window *window) {
   window_set_touch_bridge_disabled(window, true);
   touch_service_subscribe(touch_handler, NULL);
   if (!touch_service_is_enabled()) {
-    app_show_toast("Touch is off. Use Up/Down for pages, Select for OK.", TOAST_INFO, 3500);
+    app_show_toast(_(STR_TOUCH_OFF), TOAST_INFO, 3500);
   }
 #endif
 }
@@ -650,7 +666,7 @@ static void window_disappear(Window *window) {
 static void init(void) {
   g.pressed_el = -1;
   g.flash_el = -1;
-  strncpy(g.status, "Connecting to the phone...", sizeof(g.status) - 1);
+  i18n_init();
   g.layout = layout_load();
   if (g.layout) {
     int p = g.layout->start_page != 255 ? g.layout->start_page : settings_last_page();

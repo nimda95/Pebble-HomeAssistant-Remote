@@ -11,10 +11,13 @@ var packLib = require('./lib/pack');
 var unpackLib = require('./lib/unpack');
 var actions = require('./lib/actions');
 var haLib = require('./lib/ha');
+var i18n = require('./lib/i18n');
 var P = require('./lib/protocol');
 var ASSETS_B64 = require('./generated/assets');
 var CONFIG_PAGE_B64 = require('./generated/config_page');
 var DEFAULTS = require('./generated/default_config');
+var STRINGS_B64 = require('./generated/strings');
+var tr = i18n.t;
 
 var VERSION = '1.1.0';
 var ENTITY_DOMAINS = ['remote', 'media_player', 'script', 'scene', 'button', 'input_button', 'switch', 'light', 'fan', 'input_boolean', 'automation', 'cover'];
@@ -54,6 +57,8 @@ var state = {
   pending: {},
   restoring: false,
   backup: null,
+  watchLocale: '',  // the watch's system locale, from HELLO
+  watchShown: null, // languages the watch can draw, from HELLO
 };
 
 function hasLocalConfig() {
@@ -62,6 +67,23 @@ function hasLocalConfig() {
 
 function ha() {
   return new haLib.HA(state.settings);
+}
+
+// ---------------------------------------------------------------------------- language
+
+// Messages for the watch use the language the watch shows (same rule as src/c/i18n.c).
+var stringsLoaded = false;
+function applyLang() {
+  var code = i18n.resolve(state.settings.lang, state.watchLocale, state.watchShown);
+  if (!i18n.has(code) && !stringsLoaded) {
+    stringsLoaded = true;
+    i18n.loadPacked(STRINGS_B64);
+  }
+  i18n.setLang(code);
+}
+
+function sendLang() {
+  send({ cmd: P.CMD_LANG, text: i18n.setting(state.settings.lang) });
 }
 
 function getAssets() {
@@ -75,7 +97,7 @@ function getModel() {
   var m = modelLib.compile(cfg, getAssets());
   if (m.errors.length) {
     console.log('config errors: ' + m.errors.join('; ') + ' - falling back to the default config');
-    toast('Config error: ' + m.errors[0], P.TOAST_ERROR);
+    toast(tr('configError', { msg: m.errors[0] }), P.TOAST_ERROR);
     m = modelLib.compile(DEFAULTS.config, getAssets());
   }
   state.model = m;
@@ -173,7 +195,7 @@ function pushLayout(force) {
       packed = packLib.pack(model, screen, state.iconCache);
     } catch (e) {
       console.log('pack failed: ' + e.stack);
-      toast('Layout error: ' + e.message, P.TOAST_ERROR);
+      toast(tr('layoutError', { msg: e.message }), P.TOAST_ERROR);
       return;
     }
     if (packed.missingIcons.length) console.log('icons not found: ' + packed.missingIcons.join(', '));
@@ -225,6 +247,7 @@ function onBackupData(msg) {
   var total = msg.total | 0;
   if (!total) {
     state.restoring = false;
+    sendLang();
     pushLayout(false);
     return;
   }
@@ -248,6 +271,8 @@ function onBackupData(msg) {
   }
   state.backup = null;
   state.restoring = false;
+  applyLang();
+  sendLang();
   pushLayout(false);
 }
 
@@ -262,7 +287,7 @@ function pageIndex(model, current, spec) {
   var s = String(spec).toLowerCase();
   if (/^\d+$/.test(s)) return Math.max(0, Math.min(n - 1, parseInt(s, 10) - 1));
   for (var i = 0; i < n; i++) if (model.pages[i].name.toLowerCase() === s) return i;
-  throw new Error('No page named "' + spec + '"');
+  throw new Error(tr('noPage', { page: spec }));
 }
 
 // Actions run one after another, in the order the watch sent them. Planning is part of the
@@ -293,8 +318,8 @@ function enqueue(plan, ev) {
 }
 
 function getEntityState(id, cb) {
-  ha().getState(id, function (err, st) {
-    if (err && /\(404\)/.test(err.message)) err = new Error('Unknown entity ' + id);
+  ha().getState(id, function (err, st, status) {
+    if (err && status === 404) err = new Error(tr('unknownEntity', { id: id }));
     cb(err, st);
   });
 }
@@ -349,7 +374,7 @@ function onEvent(msg) {
   if (ev.gesture === actions.G.REPEAT && inFlight > 2) return;
 
   if (!ha().configured()) {
-    toast('Open the app settings on your phone to connect Home Assistant', P.TOAST_ERROR);
+    toast(tr('openSettings'), P.TOAST_ERROR);
     return;
   }
   var action, vars, holdFallback = false;
@@ -412,34 +437,40 @@ function onHello(msg) {
   state.inbox = msg.inbox_size | 0 || 2026;
   state.watchHash = (msg.hash | 0) >>> 0;
   state.watchPage = msg.page | 0;
-  var watchHasBackup = (msg.value | 0) === 1;
+  var flags = msg.value | 0;
+  var watchHasBackup = (flags & 1) === 1;
+  state.watchLocale = String(msg.text || '');
+  state.watchShown = flags >> 1 ? i18n.maskToCodes(flags >> 1) : null;
+  applyLang();
   if (!hasLocalConfig() && watchHasBackup && !state.restoring) {
     state.restoring = true;
     send({ cmd: P.CMD_BACKUP_REQUEST });
     return;
   }
   if (state.restoring) return;
+  sendLang();
   pushLayout(false);
   if (!ha().configured()) {
-    toast('Open the app settings on your phone to connect Home Assistant', P.TOAST_INFO);
+    toast(tr('openSettings'), P.TOAST_INFO);
   } else if (hasLocalConfig() && ((msg.backup_hash | 0) >>> 0) !== packLib.fnv1a(backupBytes())) {
     sendBackup(); // the watch has no backup, or an older one
   }
 }
 
 // Reports unexpected exceptions on the watch instead of failing silently.
+// `name` is a message key: opMessage, opStartup, ...
 function guard(name, fn) {
   return function (e) {
     try {
       fn(e);
     } catch (err) {
       console.log(name + ' failed: ' + (err && err.stack ? err.stack : err));
-      toast(name + ' failed: ' + (err && err.message ? err.message : err), P.TOAST_ERROR);
+      toast(tr('failed', { what: tr(name), msg: err && err.message ? err.message : err }), P.TOAST_ERROR);
     }
   };
 }
 
-Pebble.addEventListener('appmessage', guard('Message', function (e) {
+Pebble.addEventListener('appmessage', guard('opMessage', function (e) {
   var msg = e.payload || {};
   switch (msg.cmd) {
     case P.CMD_HELLO: onHello(msg); break;
@@ -450,8 +481,9 @@ Pebble.addEventListener('appmessage', guard('Message', function (e) {
   }
 }));
 
-Pebble.addEventListener('ready', guard('Startup', function () {
+Pebble.addEventListener('ready', guard('opStartup', function () {
   console.log('HA Remote ' + VERSION + ' ready');
+  applyLang();
   send({ cmd: P.CMD_PHONE_READY, hash: 0 });
   setTimeout(refreshEntities, 3000);
 }));
@@ -497,7 +529,7 @@ function watchPlatform() {
   return null;
 }
 
-Pebble.addEventListener('showConfiguration', guard('Settings page', function () {
+Pebble.addEventListener('showConfiguration', guard('opSettingsPage', function () {
   var html = inflate.gunzipBase64ToString(CONFIG_PAGE_B64);
   var ents = load('entities', null);
   var init = {
@@ -510,6 +542,8 @@ Pebble.addEventListener('showConfiguration', guard('Settings page', function () 
     entities: ents ? ents.list : [],
     iconCache: state.iconCache,
     assets: ASSETS_B64,
+    strings: STRINGS_B64,
+    watch: { locale: state.watchLocale, shown: state.watchShown },
   };
   var initJson = safeJson(init);
   // A replacer function, so `$&`-style patterns in the user's YAML aren't expanded.
@@ -517,19 +551,25 @@ Pebble.addEventListener('showConfiguration', guard('Settings page', function () 
   Pebble.openURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 }));
 
-Pebble.addEventListener('webviewclosed', guard('Saving settings', function (e) {
+Pebble.addEventListener('webviewclosed', guard('opSaving', function (e) {
   if (!e || !e.response) return;
   var data;
   try {
     var r = e.response;
     data = JSON.parse(/^\s*\{/.test(r) ? r : decodeURIComponent(r));
   } catch (err) {
-    toast('Could not read the settings', P.TOAST_ERROR);
+    toast(tr('badSettings'), P.TOAST_ERROR);
     return;
   }
   if (data.settings) {
-    state.settings = { url: haLib.normalizeUrl(data.settings.url), token: String(data.settings.token || '').trim() };
+    state.settings = {
+      url: haLib.normalizeUrl(data.settings.url),
+      token: String(data.settings.token || '').trim(),
+      lang: i18n.setting(data.settings.lang),
+    };
     save('settings', state.settings);
+    applyLang();
+    sendLang();
   }
   if (data.yaml !== undefined && data.config) {
     state.yaml = data.yaml;
@@ -547,7 +587,7 @@ Pebble.addEventListener('webviewclosed', guard('Saving settings', function (e) {
   if (ha().configured()) {
     ha().ping(function (err) {
       if (err) toast(err.message, P.TOAST_ERROR);
-      else toast('Connected to Home Assistant', P.TOAST_OK);
+      else toast(tr('connected'), P.TOAST_OK);
     });
     save('entities', null);
     refreshEntities();

@@ -5,6 +5,8 @@
 // Unsupported syntax throws, and the caller reports the error on the watch.
 'use strict';
 
+var tr = require('./i18n').t;
+
 function tokenize(src) {
   var toks = [];
   var i = 0;
@@ -23,7 +25,7 @@ function tokenize(src) {
         if (src[j] === '\\' && j + 1 < src.length) { s += src[j + 1]; j += 2; }
         else s += src[j++];
       }
-      if (j >= src.length) throw new Error('unterminated string in template');
+      if (j >= src.length) throw new Error(tr('tplUnterminated'));
       toks.push({ t: 'str', v: s });
       i = j + 1;
       continue;
@@ -45,7 +47,7 @@ function tokenize(src) {
       i++;
       continue;
     }
-    throw new Error('unexpected "' + c + '" in template');
+    throw new Error(tr('tplUnexpected', { tok: c }));
   }
   return toks;
 }
@@ -77,7 +79,7 @@ Parser.prototype.peek = function () { return this.toks[this.i]; };
 Parser.prototype.isOp = function (v) { var t = this.peek(); return t && t.t === 'op' && t.v === v; };
 Parser.prototype.isId = function (v) { var t = this.peek(); return t && t.t === 'id' && t.v === v; };
 Parser.prototype.expect = function (v) {
-  if (!this.isOp(v)) throw new Error('expected "' + v + '" in template');
+  if (!this.isOp(v)) throw new Error(tr('tplExpected', { tok: v }));
   this.i++;
 };
 // expr := or ('if' or 'else' expr)?
@@ -160,10 +162,10 @@ Parser.prototype.filtered = function () {
   while (this.isOp('|')) {
     this.i++;
     var t = this.peek();
-    if (!t || t.t !== 'id') throw new Error('expected filter name in template');
+    if (!t || t.t !== 'id') throw new Error(tr('tplFilterName'));
     this.i++;
     var fn = FILTERS[t.v];
-    if (!fn) throw new Error('unsupported template filter "' + t.v + '"');
+    if (!fn) throw new Error(tr('tplBadFilter', { name: t.v }));
     var args = [v];
     if (this.isOp('(')) args = args.concat(this.args());
     v = fn.apply(null, args);
@@ -186,7 +188,7 @@ Parser.prototype.postfix = function () {
     if (this.isOp('.')) {
       this.i++;
       var t = this.peek();
-      if (!t || t.t !== 'id') throw new Error('expected attribute name in template');
+      if (!t || t.t !== 'id') throw new Error(tr('tplAttrName'));
       this.i++;
       v = v == null ? undefined : v[t.v];
     } else if (this.isOp('[')) {
@@ -201,7 +203,7 @@ Parser.prototype.postfix = function () {
 };
 Parser.prototype.primary = function () {
   var t = this.peek();
-  if (!t) throw new Error('unexpected end of template');
+  if (!t) throw new Error(tr('tplEnd'));
   this.i++;
   if (t.t === 'num' || t.t === 'str') return t.v;
   if (t.t === 'op' && t.v === '(') {
@@ -224,21 +226,21 @@ Parser.prototype.primary = function () {
     if (t.v === 'none' || t.v === 'None') return null;
     if (this.isOp('(')) {
       var fn = this.vars[t.v];
-      if (typeof fn !== 'function') throw new Error('unsupported template function "' + t.v + '()"');
+      if (typeof fn !== 'function') throw new Error(tr('tplBadFunction', { name: t.v }));
       return fn.apply(null, this.args());
     }
     if (!Object.prototype.hasOwnProperty.call(this.vars, t.v)) {
-      throw new Error('unknown template variable "' + t.v + '"');
+      throw new Error(tr('tplUnknownVar', { name: t.v }));
     }
     return this.vars[t.v];
   }
-  throw new Error('unexpected "' + t.v + '" in template');
+  throw new Error(tr('tplUnexpected', { tok: t.v }));
 };
 
 function evalExpr(src, vars) {
   var p = new Parser(tokenize(src), vars);
   var v = p.expr();
-  if (p.i < p.toks.length) throw new Error('unexpected "' + p.toks[p.i].v + '" in template');
+  if (p.i < p.toks.length) throw new Error(tr('tplUnexpected', { tok: p.toks[p.i].v }));
   return v;
 }
 
@@ -251,7 +253,7 @@ function hasTemplate(s) {
 
 function renderString(s, vars) {
   if (!hasTemplate(s)) return s;
-  if (s.indexOf('{%') >= 0) throw new Error('template statements ({% %}) are not supported');
+  if (s.indexOf('{%') >= 0) throw new Error(tr('tplStatements'));
   var single = SINGLE_RE.exec(s);
   if (single && single[1].indexOf('}}') < 0) return evalExpr(single[1], vars);
   return s.replace(TPL_RE, function (_, e) {

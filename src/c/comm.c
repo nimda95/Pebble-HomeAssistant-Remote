@@ -1,5 +1,6 @@
 #include "comm.h"
 #include "app.h"
+#include "i18n.h"
 #include "layout.h"
 #include "protocol.h"
 
@@ -111,7 +112,9 @@ static void pump(void) {
       dict_write_uint8(it, MESSAGE_KEY_shape, PBL_IF_ROUND_ELSE(1, 0));
       dict_write_int32(it, MESSAGE_KEY_inbox_size, (int32_t)s_inbox_size);
       dict_write_int32(it, MESSAGE_KEY_persist_max, (int32_t)persist_get_max_size());
-      dict_write_int32(it, MESSAGE_KEY_value, backup_exists() ? 1 : 0);
+      // bit 0: has a backup; bits 1..: languages the font can draw
+      dict_write_int32(it, MESSAGE_KEY_value, (backup_exists() ? 1 : 0) | (i18n_drawable() << 1));
+      dict_write_cstring(it, MESSAGE_KEY_text, i18n_get_system_locale());
       dict_write_int32(it, MESSAGE_KEY_backup_hash, (int32_t)backup_hash());
       dict_write_uint8(it, MESSAGE_KEY_page, (uint8_t)g.page);
       break;
@@ -226,7 +229,7 @@ static void inbox_received(DictionaryIterator *it, void *ctx) {
       Layout *l = layout_parse(s_rx_layout, s_rx_layout_len, s_rx_layout_hash);
       s_rx_layout = NULL;  // owned by the layout now (or freed on failure)
       if (l) app_on_layout(l);
-      else app_show_toast("Received a broken layout", TOAST_ERROR, 4000);
+      else app_show_toast(_(STR_BROKEN_LAYOUT), TOAST_ERROR, 4000);
       break;
     }
 
@@ -267,6 +270,9 @@ static void inbox_received(DictionaryIterator *it, void *ctx) {
       s_tx_backup_off = 0;
       s_tx_backup_total = backup_size();
       pump();
+      break;
+    case CMD_LANG:
+      if (i18n_set(t_str(it, MESSAGE_KEY_text))) app_on_lang();
       break;
   }
 }

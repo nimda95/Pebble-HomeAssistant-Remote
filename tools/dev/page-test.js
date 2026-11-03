@@ -15,6 +15,7 @@ const inflate = require(path.join(ROOT, 'src/pkjs/lib/inflate'));
 const ASSETS = require(path.join(ROOT, 'src/pkjs/generated/assets'));
 const PAGE = require(path.join(ROOT, 'src/pkjs/generated/config_page'));
 const DEF = require(path.join(ROOT, 'src/pkjs/generated/default_config'));
+const STRINGS = require(path.join(ROOT, 'src/pkjs/generated/strings'));
 
 function buildHtml(init) {
   const json = JSON.stringify(init).replace(/</g, '\\u003c');
@@ -38,7 +39,7 @@ async function main() {
 
   const init = {
     version: 'test', settings: { url: 'http://ha.local:8123', token: 't' }, yaml: DEF.yaml, defaultYaml: DEF.yaml,
-    platform: 'emery', screen: null, iconCache: {}, assets: ASSETS,
+    platform: 'emery', screen: null, iconCache: {}, assets: ASSETS, strings: STRINGS,
     entities: [{ id: 'climate.living_room_ac', name: 'AC' }],
   };
   const html = buildHtml(init);

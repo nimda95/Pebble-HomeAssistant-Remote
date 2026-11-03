@@ -167,3 +167,10 @@ textarea#yaml {
   opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; z-index: 6;
 }
 .flash.show { opacity: 1; transform: translateX(-50%); }
+
+/* right-to-left (Arabic) */
+[dir=rtl] table.acts th { text-align: right; padding: 3px 0 3px 10px; }
+[dir=rtl] button.link { padding: 0 8px 0 0; }
+[dir=rtl] .nav { transform: scaleX(-1); }
+[dir=rtl] .badge, [dir=rtl] .group { letter-spacing: 0; }
+.docs code { direction: ltr; unicode-bidi: -webkit-isolate; unicode-bidi: isolate; }

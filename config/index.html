@@ -19,31 +19,40 @@
   <section class="card">
     <h2>Home Assistant</h2>
     <label class="field">
-      <span>Server URL</span>
-      <input id="url" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="http://homeassistant.local:8123">
+      <span data-i18n="serverUrl"></span>
+      <input id="url" dir="ltr" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="http://homeassistant.local:8123">
     </label>
     <label class="field">
-      <span>Long-lived access token</span>
+      <span data-i18n="token"></span>
       <div class="pw">
-        <input id="token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="eyJhbGciOi…">
-        <button type="button" class="ghost" id="showToken">Show</button>
+        <input id="token" dir="ltr" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="eyJhbGciOi…">
+        <button type="button" class="ghost" id="showToken"></button>
       </div>
     </label>
-    <p class="hint">Create a token in Home Assistant under your profile → Security → Long-lived access tokens. The phone app calls Home Assistant directly. After you save, the watch shows whether the connection works.</p>
+    <p class="hint" data-i18n="tokenHint"></p>
   </section>
 
   <section class="card">
     <div class="card-head">
-      <h2>Layout</h2>
-      <select id="watchSel" class="mini" aria-label="Watch model">
+      <h2 data-i18n="language"></h2>
+      <select id="langSel" class="mini" data-i18n-aria="language"></select>
+    </div>
+    <p class="hint" data-i18n="langHint"></p>
+    <p class="hint" id="langNote" hidden></p>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2 data-i18n="layout"></h2>
+      <select id="watchSel" class="mini" data-i18n-aria="watchModel">
         <option value="emery">Pebble Time 2</option>
         <option value="gabbro">Pebble Round 2</option>
       </select>
     </div>
     <div class="stage">
-      <button type="button" class="nav" id="prevPage" aria-label="Previous page">‹</button>
-      <div class="watch" id="screenWrap"><canvas id="screen" width="200" height="228"></canvas></div>
-      <button type="button" class="nav" id="nextPage" aria-label="Next page">›</button>
+      <button type="button" class="nav" id="prevPage" data-i18n-aria="prevPage">‹</button>
+      <div class="watch" id="screenWrap" dir="ltr"><canvas id="screen" width="200" height="228"></canvas></div>
+      <button type="button" class="nav" id="nextPage" data-i18n-aria="nextPage">›</button>
     </div>
     <div class="tabs" id="pageTabs"></div>
     <div class="page-info" id="pageInfo"></div>
@@ -54,32 +63,32 @@
   <section class="card">
     <div class="card-head">
       <h2>YAML</h2>
-      <select id="templateSel" class="mini" aria-label="Templates"></select>
+      <select id="templateSel" class="mini" data-i18n-aria="templates"></select>
     </div>
     <div id="templateBar" class="template-bar" hidden>
-      <button type="button" id="templateAdd" class="ghost">Add as new pages</button>
-      <button type="button" id="templateReplace" class="ghost danger">Replace everything</button>
+      <button type="button" id="templateAdd" class="ghost" data-i18n="addPages"></button>
+      <button type="button" id="templateReplace" class="ghost danger" data-i18n="replaceAll"></button>
       <span class="hint" id="templateHint"></span>
     </div>
-    <textarea id="yaml" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off"></textarea>
+    <textarea id="yaml" dir="ltr" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off"></textarea>
   </section>
 
   <section class="card">
     <div class="card-head">
-      <h2>Keys &amp; apps</h2>
-      <select id="platformSel" class="mini" aria-label="Platform"></select>
+      <h2 data-i18n="keysApps"></h2>
+      <select id="platformSel" class="mini" data-i18n-aria="platform"></select>
     </div>
-    <input id="keySearch" class="search" type="search" placeholder="Search keys, apps and entities" autocapitalize="off" spellcheck="false">
-    <p class="hint">Tap a name to insert it into the YAML at the cursor.</p>
+    <input id="keySearch" class="search" type="search" dir="auto" data-i18n-ph="searchKeys" autocapitalize="off" spellcheck="false">
+    <p class="hint" data-i18n="insertHint"></p>
     <div id="keys"></div>
   </section>
 
   <section class="card docs">
-    <h2>Reference</h2>
+    <h2 data-i18n="reference"></h2>
     <details open>
-      <summary>Pages</summary>
-      <p>The config is a list of pages. Each page is its own remote with its own entity, watch buttons and style. Up and Down switch pages.</p>
-      <pre>- name: TV                      # a TV or box: platform + entities
+      <summary data-i18n="docPages"></summary>
+      <p data-i18n-html="docPages1"></p>
+      <pre dir="ltr">- name: TV                      # a TV or box: platform + entities
   platform: LG webOS
   media_player_id: media_player.tv
   ok: center                    # Select button (any key name)
@@ -96,14 +105,14 @@
     - name: power
       icon: mdi:power
       tap_action: {action: toggle}   # targets the page entity</pre>
-      <p><code>entity_id</code> is the page's main entity. Actions without a target use it (<code>toggle</code>, <code>perform-action</code> in its domain), and so do sliders and <code>config.entity</code> in templates. A <code>remote.</code> or <code>media_player.</code> entity also fills <code>remote_id</code> / <code>media_player_id</code>.</p>
-      <p>A page with <code>platform</code> (or a <code>remote_id</code> / <code>media_player_id</code>, defaulting to Android TV like the card) gets that platform's keys and apps. Other pages use only their <code>custom_actions</code>.</p>
-      <p>Watch buttons per page: <code>ok:</code>, <code>up:</code> and <code>down:</code> take an element name, <code>none</code>, or <code>tap_action</code> / <code>hold_action</code> / <code>double_tap_action</code>. Up and Down still switch pages on tap unless you set their <code>tap_action</code>. Add <code>start: true</code> to the page to open first; otherwise the watch reopens the last page used.</p>
-      <p>Share settings between pages with YAML anchors: <code>- &amp;tv {name: TV, platform: Roku, …}</code>, then <code>- {&lt;&lt;: *tv, name: Apps, rows: …}</code>.</p>
+      <p data-i18n-html="docPages2"></p>
+      <p data-i18n-html="docPages3"></p>
+      <p data-i18n-html="docPages4"></p>
+      <p data-i18n-html="docPages5"></p>
     </details>
     <details>
-      <summary>Style</summary>
-      <pre>style:
+      <summary data-i18n="docStyle"></summary>
+      <pre dir="ltr">style:
   theme: dark          # or light
   accent: '#00aaff'    # pressed buttons, slider fill, page dot
   background: black    # page background
@@ -116,22 +125,22 @@ haptics: true          # also per page:
 hold_time: 500         # ms
 repeat_delay: 100
 double_tap_window: 200</pre>
-      <p>Colors are <code>#rgb</code>, <code>#rrggbb</code>, <code>rgb()</code> or names, mapped to the Pebble's 64 colors. A single element can set <code>color</code> and <code>background</code>.</p>
+      <p data-i18n-html="docStyle1"></p>
     </details>
     <details>
-      <summary>Elements</summary>
-      <p><b>button</b> (default): tap, hold, double tap. <code>hold_action: {action: repeat}</code> repeats the tap while held.</p>
-      <p><b>touchpad</b>: swipe for up/down/left/right, tap for center, swipe and hold to keep repeating. With <code>drag_action</code> it fires a step every few pixels you drag (<code>dragpad</code>).</p>
-      <p><b>circlepad</b>: a round d-pad with five buttons. A <code>drag_action</code> turns the ring into a click wheel (template variable <code>clockwise</code>).</p>
-      <p><b>slider</b>: <code>range</code>, <code>step</code>, <code>vertical</code>, <code>entity_id</code>, <code>value_attribute</code>, <code>unit_of_measurement</code>. It shows the entity's value (a percentage for a 0–1 range) and sends <code>tap_action</code> on release with <code>{{ value }}</code>.</p>
-      <p>Layout extras: <code>width: 2</code> / <code>height: 2</code> change an element's share of its row or column, and elements can be written inline in <code>rows</code> as a mapping.</p>
-      <p>Shortcuts: <code>volume_buttons</code>, <code>navigation_buttons</code>, <code>dpad</code>, <code>numpad</code>, <code>dialpad</code>, <code>xpad</code>, <code>npad</code>. An empty slot is <code>null</code> or <code>''</code>.</p>
+      <summary data-i18n="docElements"></summary>
+      <p data-i18n-html="docEl1"></p>
+      <p data-i18n-html="docEl2"></p>
+      <p data-i18n-html="docEl3"></p>
+      <p data-i18n-html="docEl4"></p>
+      <p data-i18n-html="docEl5"></p>
+      <p data-i18n-html="docEl6"></p>
     </details>
     <details>
-      <summary>Actions and templates</summary>
-      <p><code>key</code>, <code>source</code>, <code>perform-action</code> (or <code>call-service</code>), <code>toggle</code>, <code>keyboard</code> / <code>textbox</code> / <code>search</code> (dictate on the watch), <code>repeat</code>, <code>none</code>, and <code>page</code> (<code>page: next | previous | 2 | Name</code>). A list of actions runs in order.</p>
-      <p>Templates support <code>{{ value }}</code>, math, <code>| float</code>, <code>| int</code>, <code>| round(n)</code>, <code>| abs</code>, <code>a if cond else b</code>, and Home Assistant state: <code>states('sensor.x')</code>, <code>state_attr(config.entity, 'temperature')</code>, <code>is_state(…)</code>.</p>
-      <p>Not available on a watch: <code>more-info</code>, <code>navigate</code>, <code>url</code>, <code>assist</code>, <code>fire-dom-event</code>, <code>eval</code>, multi-finger and momentary actions.</p>
+      <summary data-i18n="docActions"></summary>
+      <p data-i18n-html="docAct1"></p>
+      <p data-i18n-html="docAct2"></p>
+      <p data-i18n-html="docAct3"></p>
     </details>
   </section>
   <div class="spacer"></div>
@@ -139,8 +148,8 @@ double_tap_window: 200</pre>
 
 <footer class="savebar">
   <span class="save-hint" id="saveHint"></span>
-  <button type="button" class="ghost" id="cancel">Cancel</button>
-  <button type="button" class="primary" id="save">Save</button>
+  <button type="button" class="ghost" id="cancel" data-i18n="cancel"></button>
+  <button type="button" class="primary" id="save" data-i18n="save"></button>
 </footer>
 <div class="flash" id="flash"></div>
 
